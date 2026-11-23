@@ -1,3 +1,4 @@
+
 package com.almamo.hardware;
 
 import android.app.Activity;
@@ -33,7 +34,6 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption;
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -70,8 +70,8 @@ public class NativeGoogleAuthPlugin extends Plugin {
     private void launchSignInWithGoogleOption(Activity activity, PluginCall call, String serverClientId) {
         try {
             CredentialManager credentialManager = CredentialManager.create(activity);
-            GetSignInWithGoogleOption signInWithGoogleOption = new GetSignInWithGoogleOption.Builder(serverClientId)
-                .build();
+            GetSignInWithGoogleOption signInWithGoogleOption =
+                new GetSignInWithGoogleOption.Builder(serverClientId).build();
 
             GetCredentialRequest request = new GetCredentialRequest.Builder()
                 .addCredentialOption(signInWithGoogleOption)
@@ -88,16 +88,22 @@ public class NativeGoogleAuthPlugin extends Plugin {
                         if (resolveGoogleCredentialResult(activity, call, result)) {
                             return;
                         }
-                        activity.runOnUiThread(() -> launchGoogleIdOneTapOption(activity, call, serverClientId));
+                        activity.runOnUiThread(() ->
+                            launchGoogleIdOneTapOption(activity, call, serverClientId)
+                        );
                     }
 
                     @Override
                     public void onError(@NonNull GetCredentialException e) {
                         if (e instanceof GetCredentialCancellationException) {
-                            activity.runOnUiThread(() -> call.reject("User cancelled Google Sign-In", "USER_CANCELED"));
+                            activity.runOnUiThread(() ->
+                                call.reject("User cancelled Google Sign-In", "USER_CANCELED")
+                            );
                             return;
                         }
-                        activity.runOnUiThread(() -> launchGoogleIdOneTapOption(activity, call, serverClientId));
+                        activity.runOnUiThread(() ->
+                            launchGoogleIdOneTapOption(activity, call, serverClientId)
+                        );
                     }
                 }
             );
@@ -130,18 +136,23 @@ public class NativeGoogleAuthPlugin extends Plugin {
                         if (resolveGoogleCredentialResult(activity, call, result)) {
                             return;
                         }
-                        activity.runOnUiThread(() -> launchLegacyGoogleSignIn(activity, call, serverClientId, false));
+                        activity.runOnUiThread(() ->
+                            launchLegacyGoogleSignIn(activity, call, serverClientId, false)
+                        );
                     }
 
                     @Override
                     public void onError(@NonNull GetCredentialException e) {
                         if (e instanceof GetCredentialCancellationException) {
-                            activity.runOnUiThread(() -> call.reject("User cancelled Google Sign-In", "USER_CANCELED"));
+                            activity.runOnUiThread(() ->
+                                call.reject("User cancelled Google Sign-In", "USER_CANCELED")
+                            );
                             return;
                         }
-                        boolean hadNoCredential = (e instanceof NoCredentialException);
-                        // Fallback seamlessly to classic native Android GoogleSignInClient account picker
-                        activity.runOnUiThread(() -> launchLegacyGoogleSignIn(activity, call, serverClientId, hadNoCredential));
+                        boolean hadNoCredential = e instanceof NoCredentialException;
+                        activity.runOnUiThread(() ->
+                            launchLegacyGoogleSignIn(activity, call, serverClientId, hadNoCredential)
+                        );
                     }
                 }
             );
@@ -150,37 +161,56 @@ public class NativeGoogleAuthPlugin extends Plugin {
         }
     }
 
-    private boolean resolveGoogleCredentialResult(Activity activity, PluginCall call, GetCredentialResponse result) {
+    private boolean resolveGoogleCredentialResult(
+        Activity activity,
+        PluginCall call,
+        GetCredentialResponse result
+    ) {
         Credential credential = result.getCredential();
+
         if (
             credential instanceof CustomCredential &&
             GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(credential.getType())
         ) {
             try {
-                GoogleIdTokenCredential googleCred = GoogleIdTokenCredential.createFrom(credential.getData());
+                GoogleIdTokenCredential googleCred =
+                    GoogleIdTokenCredential.createFrom(credential.getData());
+
                 JSObject ret = new JSObject();
                 ret.put("idToken", googleCred.getIdToken());
                 ret.put("email", googleCred.getId());
                 ret.put("displayName", googleCred.getDisplayName());
+
                 if (googleCred.getProfilePictureUri() != null) {
                     ret.put("photoUrl", googleCred.getProfilePictureUri().toString());
                 }
+
                 ret.put("provider", "google-native-credential-manager");
                 activity.runOnUiThread(() -> call.resolve(ret));
                 return true;
-            } catch (GoogleIdTokenParsingException ignored) {
+
+            } catch (Exception ignored) {
                 return false;
             }
         }
+
         return false;
     }
 
     private boolean legacyTriedAfterNoCredential = false;
 
-    private void launchLegacyGoogleSignIn(Activity activity, PluginCall call, String serverClientId, boolean noCredentialFromCm) {
+    private void launchLegacyGoogleSignIn(
+        Activity activity,
+        PluginCall call,
+        String serverClientId,
+        boolean noCredentialFromCm
+    ) {
         this.legacyTriedAfterNoCredential = noCredentialFromCm;
+
         try {
-            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(
+                GoogleSignInOptions.DEFAULT_SIGN_IN
+            )
                 .requestIdToken(serverClientId)
                 .requestEmail()
                 .requestProfile()
@@ -188,7 +218,9 @@ public class NativeGoogleAuthPlugin extends Plugin {
 
             GoogleSignInClient signInClient = GoogleSignIn.getClient(activity, gso);
             Intent signInIntent = signInClient.getSignInIntent();
+
             startActivityForResult(call, signInIntent, "handleLegacyGoogleSignInResult");
+
         } catch (Exception ex) {
             call.reject(
                 ex.getMessage() != null ? ex.getMessage() : "Native Google Sign-In failed",
@@ -202,25 +234,36 @@ public class NativeGoogleAuthPlugin extends Plugin {
         if (call == null) {
             return;
         }
+
         Intent data = result != null ? result.getData() : null;
         Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+
         try {
             GoogleSignInAccount account = task.getResult(ApiException.class);
+
             if (account == null || account.getIdToken() == null || account.getIdToken().isEmpty()) {
-                call.reject("Missing Google ID Token (check Web Client ID & SHA-1)", "MISSING_ID_TOKEN");
+                call.reject(
+                    "Missing Google ID Token (check Web Client ID & SHA-1)",
+                    "MISSING_ID_TOKEN"
+                );
                 return;
             }
+
             JSObject ret = new JSObject();
             ret.put("idToken", account.getIdToken());
             ret.put("email", account.getEmail());
             ret.put("displayName", account.getDisplayName());
+
             if (account.getPhotoUrl() != null) {
                 ret.put("photoUrl", account.getPhotoUrl().toString());
             }
+
             ret.put("provider", "google-native-gms");
             call.resolve(ret);
+
         } catch (ApiException apiEx) {
             int statusCode = apiEx.getStatusCode();
+
             if (
                 statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED ||
                 statusCode == CommonStatusCodes.CANCELED
@@ -228,6 +271,7 @@ public class NativeGoogleAuthPlugin extends Plugin {
                 call.reject("User cancelled Google Sign-In", "USER_CANCELED");
                 return;
             }
+
             if (statusCode == CommonStatusCodes.DEVELOPER_ERROR) {
                 call.reject(
                     "ApiException: 10 (DEVELOPER_ERROR) - يجب إضافة بصمة SHA-1 لتطبيق com.almamo.hardware في Firebase Console.",
@@ -235,26 +279,42 @@ public class NativeGoogleAuthPlugin extends Plugin {
                 );
                 return;
             }
-            if (statusCode == CommonStatusCodes.SIGN_IN_REQUIRED || (legacyTriedAfterNoCredential && statusCode == GoogleSignInStatusCodes.INTERNAL_ERROR)) {
-                call.reject("No signed-in Google account found on Android device", "NO_GOOGLE_ACCOUNT");
+
+            if (
+                statusCode == CommonStatusCodes.SIGN_IN_REQUIRED ||
+                (legacyTriedAfterNoCredential &&
+                    statusCode == GoogleSignInStatusCodes.INTERNAL_ERROR)
+            ) {
+                call.reject(
+                    "No signed-in Google account found on Android device",
+                    "NO_GOOGLE_ACCOUNT"
+                );
                 return;
             }
+
             if (statusCode == CommonStatusCodes.NETWORK_ERROR) {
                 call.reject("Network error during Google Sign-In", "NETWORK_ERROR");
                 return;
             }
+
             call.reject(
-                "GoogleSignIn ApiException: " + statusCode + " " + (apiEx.getMessage() != null ? apiEx.getMessage() : ""),
+                "GoogleSignIn ApiException: " + statusCode + " " +
+                    (apiEx.getMessage() != null ? apiEx.getMessage() : ""),
                 "GMS_" + statusCode
             );
+
         } catch (Exception ex) {
-            call.reject(ex.getMessage() != null ? ex.getMessage() : "Google Sign-In error", "NATIVE_SIGN_IN_ERROR");
+            call.reject(
+                ex.getMessage() != null ? ex.getMessage() : "Google Sign-In error",
+                "NATIVE_SIGN_IN_ERROR"
+            );
         }
     }
 
     @PluginMethod
     public void signOut(PluginCall call) {
         Activity activity = getActivity();
+
         if (activity == null) {
             call.resolve();
             return;
@@ -262,6 +322,7 @@ public class NativeGoogleAuthPlugin extends Plugin {
 
         try {
             CredentialManager credentialManager = CredentialManager.create(activity);
+
             credentialManager.clearCredentialStateAsync(
                 new ClearCredentialStateRequest(),
                 new CancellationSignal(),
@@ -274,18 +335,21 @@ public class NativeGoogleAuthPlugin extends Plugin {
                     public void onError(@NonNull ClearCredentialException e) {}
                 }
             );
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
 
         try {
             String serverClientId = resolveServerClientId(call);
-            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+
+            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(
+                GoogleSignInOptions.DEFAULT_SIGN_IN
+            )
                 .requestIdToken(serverClientId)
                 .requestEmail()
                 .build();
+
             GoogleSignIn.getClient(activity, gso).signOut();
-        } catch (Exception ignored) {
-        }
+
+        } catch (Exception ignored) {}
 
         call.resolve();
     }
