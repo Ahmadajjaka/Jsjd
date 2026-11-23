@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -25,12 +26,15 @@ const NativeGoogleAuth = registerPlugin<NativeGoogleAuthPluginInterface>('Native
 
 export function isNativeGoogleAuthAvailable(): boolean {
   if (typeof window === 'undefined') return false;
+
   try {
     if (!Capacitor.isNativePlatform()) return false;
     if (Capacitor.getPlatform() !== 'android') return false;
+
     if (typeof Capacitor.isPluginAvailable === 'function') {
       return Capacitor.isPluginAvailable('NativeGoogleAuth');
     }
+
     return true;
   } catch {
     return false;
@@ -59,6 +63,7 @@ export function resolveGoogleSignInStrategy(options: {
       allowBrowserFallback: false,
     };
   }
+
   return {
     mode: 'web-popup-redirect',
     allowBrowserFallback: true,
@@ -73,6 +78,15 @@ export function classifyNativeGoogleError(err: any): {
   const code = String(err?.code || '');
   const rawMessage = String(err?.message || err || '');
   const upper = `${code} ${rawMessage}`.toUpperCase();
+
+  // Diagnostic errors must not be hidden as ordinary user cancellation.
+  if (
+    code === 'CM_CANCELLED' ||
+    code === 'CREDENTIAL_PARSE_ERROR' ||
+    code === 'EMPTY_ID_TOKEN'
+  ) {
+    return { kind: 'other', code, rawMessage };
+  }
 
   if (
     code === 'USER_CANCELED' ||
@@ -128,7 +142,12 @@ export async function signInWithNativeGoogle(
   );
 }
 
-export async function signOutNativeGoogle(serverClientId?: string): Promise<void> {
+export async function signOutNativeGoogle(
+  serverClientId?: string
+): Promise<void> {
   if (!isNativeGoogleAuthAvailable()) return;
-  await NativeGoogleAuth.signOut(serverClientId ? { serverClientId } : {});
+
+  await NativeGoogleAuth.signOut(
+    serverClientId ? { serverClientId } : {}
+  );
 }
