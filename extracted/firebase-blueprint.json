@@ -1,0 +1,352 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin Record",
+      "description": "Designated administrator UID record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "Admin email address" },
+        "createdAt": { "type": "string", "description": "Timestamp when admin was registered" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Staff and user profile with RBAC permissions",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "displayName": { "type": "string", "description": "Full name of the user" },
+        "role": { "type": "string", "enum": ["admin", "accountant", "salesperson", "warehouse", "custom"], "description": "Assigned store role" },
+        "roleNameArabic": { "type": "string", "description": "Role title in Arabic" },
+        "permissions": { "type": "array", "description": "Granted permission keys" },
+        "isActive": { "type": "boolean", "description": "Whether account is currently active" },
+        "accessStatus": { "type": "string", "enum": ["approved", "pending", "rejected", "banned", "restricted"], "description": "Admin moderation status for account access" },
+        "restrictionNote": { "type": "string", "maxLength": 500, "description": "Admin explanation of restrictions or ban" },
+        "isReadOnly": { "type": "boolean", "description": "Whether restricted user is locked to read-only access" },
+        "restrictedBy": { "type": "string", "maxLength": 120, "description": "Admin name or ID who applied restriction" },
+        "restrictedAt": { "type": "string", "maxLength": 64, "description": "Timestamp of restriction update" },
+        "lastLogin": { "type": "string", "description": "Last sign-in timestamp" }
+      },
+      "required": ["uid", "email", "displayName", "role", "isActive"]
+    },
+    "StoreSettings": {
+      "title": "Store Settings",
+      "description": "Hardware store commercial and accounting configuration",
+      "type": "object",
+      "properties": {
+        "storeName": { "type": "string", "description": "Name of hardware shop" },
+        "storeTagline": { "type": "string", "description": "Commercial description" },
+        "phone": { "type": "string", "description": "Contact phone" },
+        "address": { "type": "string", "description": "Store location" },
+        "currency": { "type": "string", "description": "Selected accounting currency" },
+        "currencySymbol": { "type": "string", "description": "Currency abbreviation" },
+        "initialCash": { "type": "number", "description": "Initial drawer cash balance" },
+        "adminEmail": { "type": "string", "description": "Primary administrator Google email" },
+        "customerDebtDueDays": { "type": "number", "description": "Allowed customer debt repayment period in days before dashboard alert" },
+        "supplierDebtDueDays": { "type": "number", "description": "Allowed supplier payable period in days before dashboard alert" }
+      },
+      "required": ["storeName", "currency", "initialCash"]
+    },
+    "Product": {
+      "title": "Hardware Product",
+      "description": "Inventory hardware and building material item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Product unique ID" },
+        "name": { "type": "string", "description": "Product name" },
+        "code": { "type": "string", "description": "SKU or barcode" },
+        "category": { "type": "string", "description": "Material category" },
+        "unit": { "type": "string", "description": "Unit of measurement" },
+        "currentStock": { "type": "number", "description": "Current on-hand stock" },
+        "minStock": { "type": "number", "description": "Low stock warning threshold" },
+        "costPrice": { "type": "number", "description": "Purchasing cost per unit" },
+        "sellingPrice": { "type": "number", "description": "Retail selling price" },
+        "primarySupplier": { "type": "string", "description": "Main supplier name" },
+        "lastPurchaseDate": { "type": "string", "description": "Last stock intake date" },
+        "lastSaleDate": { "type": "string", "description": "Last sold date" }
+      },
+      "required": ["id", "name", "category", "unit", "currentStock", "costPrice", "sellingPrice"]
+    },
+    "SaleInvoice": {
+      "title": "Sale Invoice",
+      "description": "Commercial sales transaction receipt",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Invoice ID" },
+        "invoiceNumber": { "type": "string", "description": "Consecutive invoice number" },
+        "date": { "type": "string", "description": "Sale date" },
+        "time": { "type": "string", "description": "Sale time" },
+        "customerId": { "type": "string", "description": "Optional customer ID" },
+        "customerName": { "type": "string", "description": "Customer name or Cash Customer" },
+        "items": { "type": "array", "description": "Array of sold line items" },
+        "subtotal": { "type": "number", "description": "Subtotal before discount" },
+        "discount": { "type": "number", "description": "Discount applied" },
+        "total": { "type": "number", "description": "Net invoice total" },
+        "paidAmount": { "type": "number", "description": "Cash paid immediately" },
+        "remainingAmount": { "type": "number", "description": "Credit balance on customer" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "credit", "partial"], "description": "Payment term" },
+        "grossProfit": { "type": "number", "description": "Profit margin on this sale" },
+        "status": { "type": "string", "enum": ["completed", "returned"], "description": "Invoice status" },
+        "createdBy": { "type": "string", "description": "Name or ID of cashier" }
+      },
+      "required": ["id", "invoiceNumber", "date", "customerName", "total", "paidAmount", "paymentMethod", "status"]
+    },
+    "PurchaseInvoice": {
+      "title": "Purchase Invoice",
+      "description": "Supplier purchase and inventory replenishment invoice",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Purchase ID" },
+        "invoiceNumber": { "type": "string", "description": "Supplier invoice number" },
+        "date": { "type": "string", "description": "Purchase date" },
+        "supplierId": { "type": "string", "description": "Supplier ID" },
+        "supplierName": { "type": "string", "description": "Supplier business name" },
+        "items": { "type": "array", "description": "Purchased items list" },
+        "total": { "type": "number", "description": "Total purchase value" },
+        "paidAmount": { "type": "number", "description": "Cash paid to supplier" },
+        "remainingAmount": { "type": "number", "description": "Remaining debt owed" },
+        "paymentMethod": { "type": "string", "enum": ["cash", "credit", "partial"], "description": "Payment term" }
+      },
+      "required": ["id", "invoiceNumber", "date", "supplierName", "total", "paidAmount"]
+    },
+    "Expense": {
+      "title": "Operating Expense",
+      "description": "Daily store expense record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Expense ID" },
+        "date": { "type": "string", "description": "Expense date" },
+        "category": { "type": "string", "description": "Expense category" },
+        "description": { "type": "string", "description": "Expense details" },
+        "amount": { "type": "number", "description": "Paid amount" },
+        "paymentMethod": { "type": "string", "description": "Cash or bank payment" },
+        "notes": { "type": "string", "description": "Extra notes" }
+      },
+      "required": ["id", "date", "category", "description", "amount"]
+    },
+    "CashTransaction": {
+      "title": "Cash Transaction",
+      "description": "Cash drawer movement and audit entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Transaction ID" },
+        "date": { "type": "string", "description": "Transaction date" },
+        "time": { "type": "string", "description": "Transaction time" },
+        "type": { "type": "string", "description": "Sale, purchase, expense, or adjustment" },
+        "description": { "type": "string", "description": "Statement explanation" },
+        "flow": { "type": "string", "enum": ["in", "out"], "description": "Cash in or cash out" },
+        "amount": { "type": "number", "description": "Cash amount" },
+        "runningBalance": { "type": "number", "description": "Resulting drawer cash balance" }
+      },
+      "required": ["id", "date", "time", "flow", "amount", "runningBalance"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer record with receivable balance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Customer ID" },
+        "name": { "type": "string", "description": "Customer full name" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "address": { "type": "string", "description": "Address or workshop" },
+        "balance": { "type": "number", "description": "Outstanding debt amount owed to store" }
+      },
+      "required": ["id", "name", "balance"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Hardware manufacturer or wholesale supplier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Supplier ID" },
+        "name": { "type": "string", "description": "Contact or company name" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "company": { "type": "string", "description": "Company name" },
+        "balance": { "type": "number", "description": "Payable balance owed by store" }
+      },
+      "required": ["id", "name", "balance"]
+    },
+    "CustomerPayment": {
+      "title": "Customer Debt Payment",
+      "description": "Payment receipt from customer paying off their debt",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Payment ID" },
+        "date": { "type": "string", "description": "Payment date" },
+        "time": { "type": "string", "description": "Payment time" },
+        "customerId": { "type": "string", "description": "Customer ID" },
+        "customerName": { "type": "string", "description": "Customer name" },
+        "amount": { "type": "number", "description": "Amount paid" },
+        "notes": { "type": "string", "description": "Payment notes" }
+      },
+      "required": ["id", "date", "customerId", "customerName", "amount"]
+    },
+    "SupplierPayment": {
+      "title": "Supplier Debt Payment",
+      "description": "Payment voucher paid to supplier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Payment ID" },
+        "date": { "type": "string", "description": "Payment date" },
+        "time": { "type": "string", "description": "Payment time" },
+        "supplierId": { "type": "string", "description": "Supplier ID" },
+        "supplierName": { "type": "string", "description": "Supplier name" },
+        "amount": { "type": "number", "description": "Amount paid" },
+        "notes": { "type": "string", "description": "Payment notes" }
+      },
+      "required": ["id", "date", "supplierId", "supplierName", "amount"]
+    },
+    "InventoryAdjustment": {
+      "title": "Stock Adjustment",
+      "description": "Inventory audit adjustment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Adjustment ID" },
+        "date": { "type": "string", "description": "Adjustment date" },
+        "productId": { "type": "string", "description": "Product ID" },
+        "productName": { "type": "string", "description": "Product name" },
+        "type": { "type": "string", "enum": ["add", "subtract", "recount"], "description": "Adjustment type" },
+        "quantity": { "type": "number", "description": "Adjustment quantity" },
+        "reason": { "type": "string", "description": "Reason for stock discrepancy" }
+      },
+      "required": ["id", "date", "productId", "type", "quantity", "reason"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Tamper-evident activity trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Log ID" },
+        "date": { "type": "string", "description": "Log date" },
+        "time": { "type": "string", "description": "Log time" },
+        "action": { "type": "string", "description": "Action performed" },
+        "entityType": { "type": "string", "description": "Target entity" },
+        "entityId": { "type": "string", "description": "Target entity ID" },
+        "details": { "type": "string", "description": "Detailed explanation" },
+        "userId": { "type": "string", "description": "User UID who performed action" },
+        "userName": { "type": "string", "description": "User name" }
+      },
+      "required": ["id", "date", "time", "action", "entityType", "entityId", "details"]
+    },
+    "LoginAttempt": {
+      "title": "Login Attempt",
+      "description": "Security record of Google sign-in attempts (successful, failed, cancelled, blocked)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Attempt unique ID" },
+        "date": { "type": "string", "description": "Attempt date YYYY-MM-DD" },
+        "time": { "type": "string", "description": "Attempt time HH:mm:ss" },
+        "timestamp": { "type": "number", "description": "Epoch timestamp in milliseconds" },
+        "email": { "type": "string", "description": "Google email used or attempted" },
+        "userName": { "type": "string", "description": "User display name or identified seller name" },
+        "attemptedRole": { "type": "string", "enum": ["admin", "salesperson", "unknown"], "description": "Selected or attempted store role" },
+        "status": { "type": "string", "enum": ["success", "failed", "cancelled", "blocked"], "description": "Attempt outcome status" },
+        "statusArabic": { "type": "string", "description": "Outcome status in Arabic" },
+        "deviceInfo": { "type": "string", "description": "Client device and browser summary" },
+        "userAgent": { "type": "string", "description": "Raw browser user agent string" },
+        "errorMessage": { "type": "string", "description": "Error details if failed" },
+        "details": { "type": "string", "description": "Descriptive summary in Arabic" },
+        "snapshotId": { "type": "string", "maxLength": 128, "description": "Local IndexedDB security snapshot reference ID" },
+        "snapshotStatus": { "type": "string", "enum": ["captured", "denied", "no_camera", "disabled", "error"], "description": "Front-camera capture status" },
+        "entryMethod": { "type": "string", "enum": ["lock_screen", "password_login", "pin_confirm", "google_auth"], "description": "Authentication surface used" }
+      },
+      "required": ["id", "date", "time", "timestamp", "status", "statusArabic", "attemptedRole"]
+    },
+    "LoginAccessRequest": {
+      "title": "Login Access Request",
+      "description": "Incoming user access request awaiting Admin approval, rejection, ban, or work restriction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Unique request document ID" },
+        "uid": { "type": "string", "maxLength": 128, "description": "Requester Firebase Auth UID" },
+        "email": { "type": "string", "maxLength": 200, "description": "Requester email or identifier" },
+        "fullName": { "type": "string", "maxLength": 160, "description": "Requester display full name" },
+        "username": { "type": "string", "maxLength": 100, "description": "Optional requested username" },
+        "requestedRole": { "type": "string", "enum": ["salesperson", "accountant", "warehouse", "custom"], "description": "Requested role" },
+        "requestedRoleArabic": { "type": "string", "maxLength": 120, "description": "Requested role label in Arabic" },
+        "reason": { "type": "string", "maxLength": 500, "description": "Optional request note from user" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "banned", "restricted"], "description": "Current moderation status" },
+        "assignedRole": { "type": "string", "enum": ["admin", "accountant", "salesperson", "warehouse", "custom"], "description": "Role assigned by admin" },
+        "assignedPermissions": { "type": "array", "description": "Explicitly allowed permission keys when restricted or custom" },
+        "restrictionNote": { "type": "string", "maxLength": 500, "description": "Work restriction details written by admin" },
+        "isReadOnly": { "type": "boolean", "description": "Whether restricted account is read-only" },
+        "decisionReason": { "type": "string", "maxLength": 500, "description": "Admin moderation note" },
+        "reviewedBy": { "type": "string", "maxLength": 160, "description": "Admin who reviewed the request" },
+        "reviewedAt": { "type": "string", "maxLength": 64, "description": "Timestamp of moderation action" },
+        "deviceInfo": { "type": "string", "maxLength": 250, "description": "Client device summary" },
+        "date": { "type": "string", "maxLength": 32, "description": "Request date YYYY-MM-DD" },
+        "time": { "type": "string", "maxLength": 32, "description": "Request time HH:mm:ss" },
+        "timestamp": { "type": "number", "description": "Epoch timestamp in milliseconds" }
+      },
+      "required": ["id", "email", "fullName", "requestedRole", "requestedRoleArabic", "status", "date", "time", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Authenticated administrator records"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Staff and user profiles with RBAC permissions"
+    },
+    "/store_settings/{settingId}": {
+      "schema": "StoreSettings",
+      "description": "Store configuration and preferences"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Catalog of hardware materials and inventory"
+    },
+    "/sales/{saleId}": {
+      "schema": "SaleInvoice",
+      "description": "Customer sale invoices and receipts"
+    },
+    "/purchases/{purchaseId}": {
+      "schema": "PurchaseInvoice",
+      "description": "Supplier purchase invoices"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Daily store operating expenses"
+    },
+    "/cash_transactions/{transactionId}": {
+      "schema": "CashTransaction",
+      "description": "Cash box register movements"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer accounts and debt balances"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Supplier accounts and payable balances"
+    },
+    "/customer_payments/{paymentId}": {
+      "schema": "CustomerPayment",
+      "description": "Debt collection vouchers from customers"
+    },
+    "/supplier_payments/{paymentId}": {
+      "schema": "SupplierPayment",
+      "description": "Debt payment vouchers to suppliers"
+    },
+    "/inventory_adjustments/{adjustmentId}": {
+      "schema": "InventoryAdjustment",
+      "description": "Stock inventory adjustments"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "System audit trail logs"
+    },
+    "/login_attempts/{attemptId}": {
+      "schema": "LoginAttempt",
+      "description": "Real-time login attempts and security monitoring records"
+    },
+    "/access_requests/{requestId}": {
+      "schema": "LoginAccessRequest",
+      "description": "User login access requests and admin moderation decisions"
+    }
+  }
+}

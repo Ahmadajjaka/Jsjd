@@ -1,0 +1,287 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSuperAdminEmail() {
+      return isEmailVerified() &&
+        request.auth.token.email.lower() == 'mohammedmamo2003@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdminEmail() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isActiveStaff() {
+      return isSignedIn() && (
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true &&
+          (
+            !('accessStatus' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) ||
+            (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accessStatus != 'banned' &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accessStatus != 'rejected'
+            )
+          )
+        )
+      );
+    }
+
+    function isCompressedDoc(data) {
+      return data._c == true &&
+        data._v is int &&
+        data.id is string &&
+        data.id.size() <= 128 &&
+        data.d is bytes;
+    }
+
+    function isValidAccessRequest(data) {
+      return data.keys().hasAll([
+          'id', 'email', 'fullName', 'requestedRole',
+          'requestedRoleArabic', 'status', 'date', 'time', 'timestamp'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'email', 'fullName', 'username', 'requestedRole',
+          'requestedRoleArabic', 'reason', 'status', 'assignedRole',
+          'assignedPermissions', 'restrictionNote', 'isReadOnly',
+          'decisionReason', 'reviewedBy', 'reviewedAt', 'deviceInfo',
+          'date', 'time', 'timestamp'
+        ]) &&
+        isValidId(data.id) &&
+        data.email is string && data.email.size() >= 1 && data.email.size() <= 200 &&
+        data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 160 &&
+        data.requestedRole in ['salesperson', 'accountant', 'warehouse', 'custom'] &&
+        data.requestedRoleArabic is string && data.requestedRoleArabic.size() <= 120 &&
+        data.status in ['pending', 'approved', 'rejected', 'banned', 'restricted'] &&
+        data.date is string && data.date.size() <= 32 &&
+        data.time is string && data.time.size() <= 32 &&
+        (data.timestamp is int || data.timestamp is float) &&
+        (!('uid' in data) || (data.uid is string && data.uid.size() <= 128)) &&
+        (!('username' in data) || (data.username is string && data.username.size() <= 100)) &&
+        (!('reason' in data) || (data.reason is string && data.reason.size() <= 500)) &&
+        (!('assignedRole' in data) || data.assignedRole in ['admin', 'accountant', 'salesperson', 'warehouse', 'custom']) &&
+        (!('assignedPermissions' in data) || (data.assignedPermissions is list && data.assignedPermissions.size() <= 25 && (data.assignedPermissions.size() == 0 || data.assignedPermissions[0] is string))) &&
+        (!('restrictionNote' in data) || (data.restrictionNote is string && data.restrictionNote.size() <= 500)) &&
+        (!('isReadOnly' in data) || data.isReadOnly is bool) &&
+        (!('decisionReason' in data) || (data.decisionReason is string && data.decisionReason.size() <= 500)) &&
+        (!('reviewedBy' in data) || (data.reviewedBy is string && data.reviewedBy.size() <= 160)) &&
+        (!('reviewedAt' in data) || (data.reviewedAt is string && data.reviewedAt.size() <= 64)) &&
+        (!('deviceInfo' in data) || (data.deviceInfo is string && data.deviceInfo.size() <= 250));
+    }
+
+    function isValidUserDoc(data) {
+      return data.keys().hasAll(['id', 'username', 'fullName', 'role', 'roleNameArabic', 'permissions', 'isActive']) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'username', 'password', 'fullName', 'email', 'role',
+          'roleNameArabic', 'permissions', 'isActive', 'accessStatus',
+          'restrictionNote', 'isReadOnly', 'restrictedBy', 'restrictedAt',
+          'avatarColor', 'createdAt', 'lastLogin'
+        ]) &&
+        data.id is string && data.id.size() <= 128 &&
+        (!('uid' in data) || (data.uid is string && data.uid.size() <= 128)) &&
+        data.username is string && data.username.size() <= 120 &&
+        data.fullName is string && data.fullName.size() <= 160 &&
+        data.role in ['admin', 'accountant', 'salesperson', 'warehouse', 'custom'] &&
+        data.roleNameArabic is string && data.roleNameArabic.size() <= 120 &&
+        data.permissions is list && data.permissions.size() <= 25 &&
+        data.isActive is bool &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+        (!('password' in data) || (data.password is string && data.password.size() <= 128)) &&
+        (!('accessStatus' in data) || data.accessStatus in ['approved', 'pending', 'rejected', 'banned', 'restricted']) &&
+        (!('restrictionNote' in data) || (data.restrictionNote is string && data.restrictionNote.size() <= 500)) &&
+        (!('isReadOnly' in data) || data.isReadOnly is bool) &&
+        (!('restrictedBy' in data) || (data.restrictedBy is string && data.restrictedBy.size() <= 160)) &&
+        (!('restrictedAt' in data) || (data.restrictedAt is string && data.restrictedAt.size() <= 64)) &&
+        (!('avatarColor' in data) || (data.avatarColor is string && data.avatarColor.size() <= 120)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+        (!('lastLogin' in data) || (data.lastLogin is string && data.lastLogin.size() <= 64));
+    }
+
+    // Admins Registry
+    match /admins/{adminId} {
+      allow get: if isOwner(adminId) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isSignedIn() && isValidId(adminId) && isOwner(adminId) && isSuperAdminEmail();
+      allow delete: if isSignedIn() && isValidId(adminId) && isAdmin();
+    }
+
+    // Staff & User Profiles (PII Protected)
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isValidId(userId) && (
+        (isAdmin() && (isCompressedDoc(incoming()) || isValidUserDoc(incoming()))) ||
+        (
+          isOwner(userId) &&
+          isValidUserDoc(incoming()) &&
+          incoming().role != 'admin' &&
+          (!('accessStatus' in incoming()) || incoming().accessStatus in ['pending', 'approved'])
+        )
+      );
+      allow update: if isSignedIn() && isValidId(userId) && (
+        (isAdmin() && (isCompressedDoc(incoming()) || isValidUserDoc(incoming()))) ||
+        (
+          isOwner(userId) &&
+          isValidUserDoc(incoming()) &&
+          incoming().role == existing().role &&
+          incoming().permissions == existing().permissions &&
+          incoming().isActive == existing().isActive &&
+          (!('accessStatus' in existing()) || incoming().accessStatus == existing().accessStatus) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['lastLogin', 'fullName', 'email', 'avatarColor'])
+        )
+      );
+      allow delete: if isSignedIn() && isValidId(userId) && isAdmin();
+    }
+
+    // Incoming Login Access Requests & Moderation Decisions
+    match /access_requests/{requestId} {
+      allow get: if isAdmin() || (
+        isSignedIn() && (
+          ('uid' in existing() && existing().uid == request.auth.uid) ||
+          (isEmailVerified() && existing().email.lower() == request.auth.token.email.lower())
+        )
+      );
+      allow list: if isAdmin() || (isSignedIn() && existing().uid == request.auth.uid);
+      allow create: if isSignedIn() &&
+        isValidId(requestId) &&
+        isValidAccessRequest(incoming()) && (
+          isAdmin() || (
+            incoming().status == 'pending' &&
+            ('uid' in incoming() && incoming().uid == request.auth.uid) &&
+            !('assignedRole' in incoming()) &&
+            !('assignedPermissions' in incoming()) &&
+            !('isReadOnly' in incoming())
+          )
+        );
+      allow update: if isSignedIn() &&
+        isValidId(requestId) &&
+        isAdmin() &&
+        isValidAccessRequest(incoming()) &&
+        incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(requestId) && isAdmin();
+    }
+
+    // Security Audit: Login Attempts
+    match /login_attempts/{attemptId} {
+      allow create: if isValidId(attemptId) && (
+        isCompressedDoc(incoming()) ||
+        (
+          incoming().keys().hasAll(['id', 'date', 'time', 'timestamp', 'status', 'statusArabic', 'attemptedRole']) &&
+          incoming().id is string && incoming().id.size() <= 128 &&
+          incoming().date is string && incoming().date.size() <= 32
+        )
+      );
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Connection Validation Check Document
+    match /test/{docId} {
+      allow get: if isSignedIn() && isValidId(docId);
+    }
+
+    // Hardware Store Operational Collections (Compressed Deflate L9 or Standard)
+    match /store_settings/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && isAdmin();
+    }
+
+    match /products/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /sales/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /purchases/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /expenses/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /cash_transactions/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /customers/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /suppliers/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /customer_payments/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /supplier_payments/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /inventory_adjustments/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff());
+    }
+
+    match /audit_logs/{docId} {
+      allow read: if isAdmin() || isActiveStaff();
+      allow create, update: if isSignedIn() && isValidId(docId) && (isAdmin() || isActiveStaff()) && (isCompressedDoc(incoming()) || incoming() is map);
+      allow delete: if isSignedIn() && isValidId(docId) && isAdmin();
+    }
+  }
+}

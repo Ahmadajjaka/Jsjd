@@ -1,0 +1,193 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  * {
+    font-family: 'Cairo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+.font-mono {
+  font-family: 'Cairo', monospace, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Laptop, Desktop & Android Mobile Viewport Polish */
+html {
+  min-height: 100%;
+  overflow-x: clip;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  background-color: #f3f5f8;
+  color: #0f172a;
+}
+
+body {
+  min-height: 100%;
+  background-color: #f3f5f8;
+  color: #0f172a;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a {
+  touch-action: manipulation;
+}
+
+input, textarea, select, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+}
+
+.safe-pb {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* 3D Extruded Typography & Spatial Layers for "مرحبا بك في متجر خردوات المامو" */
+.stage-3d-preserve {
+  transform-style: preserve-3d;
+}
+
+.text-3d-hardware-day {
+  color: #142236;
+  text-shadow:
+    0 1px 0 #cbd5e1,
+    0 2px 0 #b6c2d1,
+    0 3px 0 #94a3b8,
+    0 4px 0 #7c8ba1,
+    0 5px 0 #64748b,
+    0 10px 22px rgba(15, 23, 42, 0.22),
+    0 2px 8px rgba(217, 119, 6, 0.24);
+}
+
+.dark .text-3d-hardware-day,
+.text-3d-hardware-night {
+  color: #fffbeb;
+  text-shadow:
+    0 1px 0 #fde68a,
+    0 2px 0 #f59e0b,
+    0 3px 0 #d97706,
+    0 4px 0 #b45309,
+    0 5px 0 #78350f,
+    0 12px 26px rgba(0, 0, 0, 0.72),
+    0 0 22px rgba(245, 158, 11, 0.35);
+}
+
+/* Dark mode theme overrides */
+html.dark, body.dark {
+  background-color: #0b0f19;
+  color: #f1f5f9;
+}
+
+.dark header {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+.dark aside {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+.dark .bg-white {
+  background-color: #111827 !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/40,
+.dark .bg-slate-50\/50 {
+  background-color: #0b0f19 !important;
+}
+
+.dark .bg-slate-100,
+.dark .bg-slate-100\/70 {
+  background-color: #1e293b !important;
+}
+
+.dark .border-slate-100 {
+  border-color: #1e293b !important;
+}
+
+.dark .border-slate-200 {
+  border-color: #1e293b !important;
+}
+
+.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+.dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark tr:hover {
+  background-color: rgba(30, 41, 59, 0.45) !important;
+}
+
+/* Compact Laptop optimized smooth scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+@media print {
+  header, aside, .print\:hidden, nav {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+  body {
+    background: #ffffff !important;
+  }
+  .fixed.inset-0 {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+}

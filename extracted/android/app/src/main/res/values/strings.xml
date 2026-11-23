@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">خردوات المامو</string>
+    <string name="title_activity_main">خردوات المامو</string>
+    <string name="package_name">com.almamo.hardware</string>
+    <string name="custom_url_scheme">com.almamo.hardware</string>
+    <string name="default_web_client_id" translatable="false">884929738685-g0k7ujn9o7p4m7t4kotal4edtgknuqgl.apps.googleusercontent.com</string>
+</resources>

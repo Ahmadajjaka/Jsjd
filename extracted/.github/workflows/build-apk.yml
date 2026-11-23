@@ -1,0 +1,170 @@
+name: Build Android APK (خردوات المامو)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Signed Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: TypeScript check & unit tests
+        run: |
+          npm run lint
+          npx --yes tsx --test src/utils/*.test.ts src/services/*.test.ts
+
+      - name: Cache deterministic APK signing keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
+        uses: actions/cache@v4
+        with:
+          path: android/keystore
+          key: almamo-release-keystore-v1
+
+      - name: Prepare Keystore & Extract SHA-1 / SHA-256 Fingerprints
+        id: keystore
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'almamo123456' }}
+          KEY_ALIAS_ENV: ${{ secrets.ANDROID_KEY_ALIAS || 'almamo' }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD || 'almamo123456' }}
+        run: |
+          mkdir -p android/keystore
+          KS_PATH="${{ github.workspace }}/android/keystore/almamo-release.jks"
+
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 --decode > "$KS_PATH"
+            echo "Using custom keystore from GitHub Secret ANDROID_KEYSTORE_BASE64"
+          elif [ ! -f "$KS_PATH" ]; then
+            keytool -genkeypair -v \
+              -keystore "$KS_PATH" \
+              -storepass "$KEYSTORE_PASS" \
+              -alias "$KEY_ALIAS_ENV" \
+              -keypass "$KEY_PASS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=AlMamo Hardware, OU=StorePOS, O=AlMamo, L=Store, ST=Tech, C=SY"
+            echo "Generated persistent release keystore inside android/keystore/"
+          else
+            echo "Restored cached deterministic release keystore"
+          fi
+
+          {
+            echo "ALMAMO_KEYSTORE_FILE=$KS_PATH"
+            echo "ALMAMO_KEYSTORE_PASSWORD=$KEYSTORE_PASS"
+            echo "ALMAMO_KEY_ALIAS=$KEY_ALIAS_ENV"
+            echo "ALMAMO_KEY_PASSWORD=$KEY_PASS"
+          } >> "$GITHUB_ENV"
+
+          CERT_INFO=$(keytool -list -v -keystore "$KS_PATH" -storepass "$KEYSTORE_PASS" -alias "$KEY_ALIAS_ENV")
+          SHA1=$(echo "$CERT_INFO" | grep -E "^\s*SHA1:" | head -n1 | sed 's/.*SHA1:\s*//' | tr -d ' ')
+          SHA256=$(echo "$CERT_INFO" | grep -E "^\s*SHA256:" | head -n1 | sed 's/.*SHA256:\s*//' | tr -d ' ')
+
+          echo "sha1=$SHA1" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+          node -e "
+            const fs = require('fs');
+            const sha256 = process.env.SHA256_VAL;
+            const payload = [{
+              relation: ['delegate_permission/common.handle_all_urls'],
+              target: {
+                namespace: 'android_app',
+                package_name: 'com.almamo.hardware',
+                sha256_cert_fingerprints: sha256 ? [sha256] : []
+              }
+            }];
+            fs.mkdirSync('public/.well-known', { recursive: true });
+            fs.writeFileSync('public/.well-known/assetlinks.json', JSON.stringify(payload, null, 2) + '\n');
+          " SHA256_VAL="$SHA256"
+
+          {
+            echo "## بصمات توقيع تطبيق خردوات المامو (APK Signing Fingerprints)"
+            echo "- **Package ID:** \`com.almamo.hardware\`"
+            echo "- **SHA-1:** \`$SHA1\`"
+            echo "- **SHA-256:** \`$SHA256\`"
+            echo ""
+            echo "### تفعيل Google Sign-In الأصلي لأندرويد (Native Credential Manager)"
+            echo "1. افتح إعدادات المشروع في Firebase Console: https://console.firebase.google.com/project/first-hook-1w2pc/settings/general"
+            echo "2. أضف أو افتح تطبيق Android بحزمة \`com.almamo.hardware\` ثم أضف بصمة **SHA-1** وبصمة **SHA-256** أعلاه."
+            echo "3. (اختياري) يمكنك حفظ محتوى \`google-services.json\` في GitHub Secret باسم \`ANDROID_GOOGLE_SERVICES_JSON\` ليتم دمجه تلقائياً في البناء القادم."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configure Optional google-services.json from Secret
+        if: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON != '' }}
+        shell: bash
+        env:
+          GS_SECRET: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const raw = (process.env.GS_SECRET || '').trim();
+            if (!raw) process.exit(0);
+            const content = raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+            JSON.parse(content);
+            fs.writeFileSync('android/app/google-services.json', content);
+            console.log('Configured android/app/google-services.json from GitHub Secret');
+          "
+
+      - name: Build Web Bundle
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: npm run build
+
+      - name: Sync Web Bundle to Capacitor Android
+        run: npx cap sync android
+
+      - name: Build Signed Release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Rename Release APK
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk almamo-hardware-store.apk
+          ls -lh almamo-hardware-store.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: almamo-hardware-store-apk
+          path: almamo-hardware-store.apk
+          retention-days: 30
+
+      - name: Attach APK to GitHub Release (on v* tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: almamo-hardware-store.apk
+          generate_release_notes: true

@@ -1,0 +1,6 @@
+{
+  "name": "محاسب خردوات المامو",
+  "description": "نظام محاسبة مالية وإدارة مخزون متكامل باللغة العربية لمتاجر الخردوات ومواد البناء",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
