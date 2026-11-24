@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ShoppingCart,
   Plus,
@@ -42,6 +42,111 @@ import { findProductByBarcode, playScanBeep } from '../utils/barcodeMatch';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { SalesAggregationView } from './SalesAggregationView';
 import { QuickCustomerSaleModal } from './QuickCustomerSaleModal';
+
+// =====================================================
+// Numeric Input - Android WebView Compatible
+// =====================================================
+
+interface NumericInputProps {
+  value: number;
+  onValueChange: (value: number) => void;
+  className?: string;
+  min?: number;
+  max?: number;
+  required?: boolean;
+  'data-testid'?: string;
+}
+
+const NumericInput: React.FC<NumericInputProps> = ({
+  value,
+  onValueChange,
+  className,
+  min = 0,
+  max,
+  required = false,
+  'data-testid': testId,
+}) => {
+  const [text, setText] = useState(String(value));
+  const lastEmittedValue = useRef<number>(value);
+
+  useEffect(() => {
+    if (value !== lastEmittedValue.current) {
+      setText(String(value));
+      lastEmittedValue.current = value;
+    }
+  }, [value]);
+
+  const handleChange = (raw: string) => {
+    const normalized = raw.replace(',', '.');
+
+    if (!/^\d*\.?\d*$/.test(normalized)) {
+      return;
+    }
+
+    setText(normalized);
+
+    if (normalized === '' || normalized === '.') {
+      return;
+    }
+
+    const parsed = Number(normalized);
+
+    if (
+      Number.isFinite(parsed) &&
+      parsed >= min &&
+      (max === undefined || parsed <= max)
+    ) {
+      lastEmittedValue.current = parsed;
+      onValueChange(parsed);
+    }
+  };
+
+  const handleBlur = () => {
+    if (text === '' || text === '.') {
+      setText(String(min));
+      lastEmittedValue.current = min;
+      onValueChange(min);
+      return;
+    }
+
+    const parsed = Number(text);
+
+    if (
+      !Number.isFinite(parsed) ||
+      parsed < min ||
+      (max !== undefined && parsed > max)
+    ) {
+      setText(String(value));
+      lastEmittedValue.current = value;
+      return;
+    }
+
+    setText(String(parsed));
+    lastEmittedValue.current = parsed;
+    onValueChange(parsed);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      pattern="[0-9]*[.,]?[0-9]*"
+      autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
+      value={text}
+      required={required}
+      data-testid={testId}
+      onChange={(event) => handleChange(event.target.value)}
+      onBlur={handleBlur}
+      className={className}
+    />
+  );
+};
+
+// =====================================================
+// Sales View
+// =====================================================
 
 interface SalesViewProps {
   products: Product[];
@@ -130,7 +235,9 @@ export const SalesView: React.FC<SalesViewProps> = ({
   // Product Selection handler
   const handleSelectProduct = (productId: string) => {
     setSelectedProductId(productId);
+
     const prod = products.find((p) => p.id === productId);
+
     if (prod) {
       setItemUnitPrice(prod.sellingPrice);
       setItemCostPrice(prod.costPrice);
@@ -143,10 +250,12 @@ export const SalesView: React.FC<SalesViewProps> = ({
   const handleProductScanned = (prod: Product, autoAdd: boolean) => {
     if (!autoAdd) {
       handleSelectProduct(prod.id);
+
       setBarcodeFeedback({
         type: 'success',
         message: `تم اختيار المادة «${prod.name}» (${prod.barcode || prod.code}) — اضبط الكمية واضغط إدراج.`,
       });
+
       return;
     }
 
@@ -161,13 +270,16 @@ export const SalesView: React.FC<SalesViewProps> = ({
       if (existingIndex !== -1) {
         return prevItems.map((it, idx) => {
           if (idx !== existingIndex) return it;
+
           const nextQty = it.quantity + 1;
+
           const calc = calculateSaleItemTotals(
             nextQty,
             it.costPrice,
             it.unitPrice,
             it.discount
           );
+
           return {
             ...it,
             quantity: nextQty,
@@ -183,6 +295,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
         prod.sellingPrice,
         0
       );
+
       const newItem: SaleItem = {
         productId: prod.id,
         productCode: prod.code,
@@ -196,6 +309,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
         total: calc.total,
         profit: calc.profit,
       };
+
       return [...prevItems, newItem];
     });
 
@@ -208,14 +322,18 @@ export const SalesView: React.FC<SalesViewProps> = ({
   // Quick manual / USB scanner lookup submit
   const handleQuickBarcodeLookup = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!quickBarcodeInput.trim()) return;
+
     const match = findProductByBarcode(products, quickBarcodeInput);
+
     if (match.product) {
       playScanBeep(true);
       handleProductScanned(match.product, true);
       setQuickBarcodeInput('');
     } else {
       playScanBeep(false);
+
       setBarcodeFeedback({
         type: 'error',
         message: `لم يتم العثور على مادة مطابقة للباركود أو الكود: ${quickBarcodeInput.trim()}`,
@@ -226,7 +344,9 @@ export const SalesView: React.FC<SalesViewProps> = ({
   // Add Item to Invoice table
   const handleAddItem = () => {
     if (!selectedProductId) return;
+
     const prod = products.find((p) => p.id === selectedProductId);
+
     if (!prod) return;
 
     if (itemQuantity <= 0) {
@@ -255,7 +375,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
       profit: itemCalculations.profit,
     };
 
-    setItems([...items, newItem]);
+    setItems((prevItems) => [...prevItems, newItem]);
 
     // Reset item form
     setSelectedProductId('');
@@ -263,10 +383,12 @@ export const SalesView: React.FC<SalesViewProps> = ({
     setItemUnitPrice(0);
     setItemCostPrice(0);
     setItemDiscount(0);
+    setItemUnit('قطعة');
+    setItemCategory('');
   };
 
   const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    setItems((prevItems) => prevItems.filter((_, i) => i !== index));
   };
 
   // Calculate totals of current invoice
@@ -293,6 +415,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
     if (isAddingNewCustomer && customCustomerName.trim()) {
       customerName = customCustomerName.trim();
       isCashCust = false;
+
       newCustomerObj = {
         id: `cust-${Date.now()}`,
         name: customerName,
@@ -305,6 +428,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
       };
     } else if (selectedCustomerId !== 'cash_customer') {
       const existingCust = customers.find((c) => c.id === selectedCustomerId);
+
       if (existingCust) {
         customerName = existingCust.name;
         isCashCust = false;
@@ -362,16 +486,22 @@ export const SalesView: React.FC<SalesViewProps> = ({
     return sales
       .filter((s) => {
         if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
+
           const matchNum = s.invoiceNumber.toLowerCase().includes(q);
           const matchCust = s.customerName.toLowerCase().includes(q);
+
           const matchItem = s.items.some((it) =>
             it.productName.toLowerCase().includes(q)
           );
+
           const matchDate = s.date.includes(q);
+
           return matchNum || matchCust || matchItem || matchDate;
         }
+
         return true;
       })
       .reverse();
@@ -385,6 +515,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
           <h2 className="text-xl md:text-2xl font-black text-slate-900">
             دفتر المبيعات اليومية وفواتير البيع
           </h2>
+
           <p className="text-xs text-slate-500 mt-0.5">
             تسجيل عمليات البيع، خصم المخزون، حساب الأرباح، وتوثيق المقبوضات والديون
           </p>
@@ -413,6 +544,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
             >
               + فاتورة جديدة
             </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('list')}
@@ -424,6 +556,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
             >
               سجل الفواتير ({sales.length})
             </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('aggregate')}
@@ -436,6 +569,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
               <BarChart3 className="w-3.5 h-3.5" />
               <span>تجميع مبيعات شهر / مدة</span>
             </button>
+
             {onNavigateToLedger && (
               <button
                 type="button"
@@ -461,6 +595,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                 <span className="text-xs font-bold text-slate-500 uppercase">
                   بيانات الفاتورة والزبون
                 </span>
+
                 <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 text-slate-800 rounded-md">
                   رقم الفاتورة: <span className="font-mono">{nextInvoiceNumber}</span>
                 </span>
@@ -471,6 +606,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-xs font-semibold text-slate-700 block mb-1">
                     تاريخ العملية
                   </label>
+
                   <input
                     type="date"
                     value={invoiceDate}
@@ -483,6 +619,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-xs font-semibold text-slate-700 block mb-1">
                     الوقت
                   </label>
+
                   <input
                     type="time"
                     value={invoiceTime}
@@ -496,6 +633,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     <label className="text-xs font-semibold text-slate-700">
                       اختيار الزبون
                     </label>
+
                     <button
                       type="button"
                       onClick={() => setIsAddingNewCustomer(!isAddingNewCustomer)}
@@ -511,7 +649,10 @@ export const SalesView: React.FC<SalesViewProps> = ({
                       onChange={(e) => setSelectedCustomerId(e.target.value)}
                       className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-hidden font-medium"
                     >
-                      <option value="cash_customer">زبون نقدي عام (دون تسجيل اسم)</option>
+                      <option value="cash_customer">
+                        زبون نقدي عام (دون تسجيل اسم)
+                      </option>
+
                       {customers.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name} {c.totalDebt > 0 ? `(عليه دين: ${formatCurrency(c.totalDebt, settings)})` : ''}
@@ -527,6 +668,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                         onChange={(e) => setCustomCustomerName(e.target.value)}
                         className="w-full text-xs p-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                       />
+
                       <input
                         type="text"
                         placeholder="رقم الهاتف (اختياري)..."
@@ -568,6 +710,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
               >
                 <div className="relative flex-1">
                   <ScanBarcode className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+
                   <input
                     type="text"
                     value={quickBarcodeInput}
@@ -576,6 +719,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     className="w-full text-xs pr-9 pl-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-hidden font-mono"
                   />
                 </div>
+
                 <button
                   type="submit"
                   className="px-4 py-2.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors shrink-0 cursor-pointer"
@@ -598,8 +742,12 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     ) : (
                       <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                     )}
-                    <span className="font-bold truncate">{barcodeFeedback.message}</span>
+
+                    <span className="font-bold truncate">
+                      {barcodeFeedback.message}
+                    </span>
                   </div>
+
                   <button
                     type="button"
                     onClick={() => setBarcodeFeedback(null)}
@@ -617,12 +765,14 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     المادة من المستودع
                   </label>
+
                   <select
                     value={selectedProductId}
                     onChange={(e) => handleSelectProduct(e.target.value)}
                     className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-hidden font-medium"
                   >
                     <option value="">-- اختر مادة من المخزون --</option>
+
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} (متوفر: {p.currentStock} {p.unit}) - {formatCurrency(p.sellingPrice, settings)}
@@ -635,12 +785,11 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     الكمية المباعة
                   </label>
-                  <input
-                    type="number"
-                    min="0.1"
-                    step="any"
+
+                  <NumericInput
+                    min={0}
                     value={itemQuantity}
-                    onChange={(e) => setItemQuantity(Math.max(0, parseFloat(e.target.value) || 0))}
+                    onValueChange={setItemQuantity}
                     className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-hidden font-mono"
                   />
                 </div>
@@ -649,6 +798,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     الوحدة
                   </label>
+
                   <input
                     type="text"
                     value={itemUnit}
@@ -661,11 +811,11 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     سعر البيع
                   </label>
-                  <input
-                    type="number"
-                    min="0"
+
+                  <NumericInput
+                    min={0}
                     value={itemUnitPrice}
-                    onChange={(e) => setItemUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                    onValueChange={setItemUnitPrice}
                     className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-hidden font-mono"
                   />
                 </div>
@@ -674,11 +824,11 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     خصم السطر
                   </label>
-                  <input
-                    type="number"
-                    min="0"
+
+                  <NumericInput
+                    min={0}
                     value={itemDiscount}
-                    onChange={(e) => setItemDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+                    onValueChange={setItemDiscount}
                     className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-hidden font-mono"
                   />
                 </div>
@@ -691,16 +841,25 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     <span>
                       سعر التكلفة: <strong className="font-mono">{formatCurrency(itemCostPrice, settings)}</strong>
                     </span>
+
                     <span>·</span>
+
                     <span>
-                      مجمل ربح السطر المتوقع: <strong className="font-mono text-emerald-700">
+                      مجمل ربح السطر المتوقع:{' '}
+                      <strong className="font-mono text-emerald-700">
                         {formatCurrency(
-                          calculateSaleItemTotals(itemQuantity, itemCostPrice, itemUnitPrice, itemDiscount).profit,
+                          calculateSaleItemTotals(
+                            itemQuantity,
+                            itemCostPrice,
+                            itemUnitPrice,
+                            itemDiscount
+                          ).profit,
                           settings
                         )}
                       </strong>
                     </span>
                   </div>
+
                   <button
                     type="button"
                     onClick={handleAddItem}
@@ -729,6 +888,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                       <th className="py-2 px-3 text-center">حذف</th>
                     </tr>
                   </thead>
+
                   <tbody className="divide-y divide-slate-100">
                     {items.length === 0 ? (
                       <tr>
@@ -739,15 +899,42 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     ) : (
                       items.map((it, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="py-2 px-3 font-mono text-slate-400">{idx + 1}</td>
-                          <td className="py-2 px-3 font-bold text-slate-900">{it.productName}</td>
-                          <td className="py-2 px-3 text-slate-500">{it.category}</td>
-                          <td className="py-2 px-3 text-center font-mono font-bold">{it.quantity}</td>
-                          <td className="py-2 px-3 text-center text-slate-600">{it.unit}</td>
-                          <td className="py-2 px-3 text-left font-mono tabular-nums">{formatCurrency(it.unitPrice, settings)}</td>
-                          <td className="py-2 px-3 text-left font-mono tabular-nums text-slate-500">{formatCurrency(it.costPrice, settings)}</td>
-                          <td className="py-2 px-3 text-left font-mono font-bold text-slate-900 tabular-nums">{formatCurrency(it.total, settings)}</td>
-                          <td className="py-2 px-3 text-left font-mono font-semibold text-emerald-700 tabular-nums">{formatCurrency(it.profit, settings)}</td>
+                          <td className="py-2 px-3 font-mono text-slate-400">
+                            {idx + 1}
+                          </td>
+
+                          <td className="py-2 px-3 font-bold text-slate-900">
+                            {it.productName}
+                          </td>
+
+                          <td className="py-2 px-3 text-slate-500">
+                            {it.category}
+                          </td>
+
+                          <td className="py-2 px-3 text-center font-mono font-bold">
+                            {it.quantity}
+                          </td>
+
+                          <td className="py-2 px-3 text-center text-slate-600">
+                            {it.unit}
+                          </td>
+
+                          <td className="py-2 px-3 text-left font-mono tabular-nums">
+                            {formatCurrency(it.unitPrice, settings)}
+                          </td>
+
+                          <td className="py-2 px-3 text-left font-mono tabular-nums text-slate-500">
+                            {formatCurrency(it.costPrice, settings)}
+                          </td>
+
+                          <td className="py-2 px-3 text-left font-mono font-bold text-slate-900 tabular-nums">
+                            {formatCurrency(it.total, settings)}
+                          </td>
+
+                          <td className="py-2 px-3 text-left font-mono font-semibold text-emerald-700 tabular-nums">
+                            {formatCurrency(it.profit, settings)}
+                          </td>
+
                           <td className="py-2 px-3 text-center">
                             <button
                               type="button"
@@ -778,6 +965,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>المجموع الفرعي ({items.length} مواد):</span>
+
                   <span className="font-mono tabular-nums font-semibold">
                     {formatCurrency(currentTotals.subtotal, settings)}
                   </span>
@@ -787,17 +975,18 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                     خصم إضافي على كامل الفاتورة
                   </label>
-                  <input
-                    type="number"
-                    min="0"
+
+                  <NumericInput
+                    min={0}
                     value={invoiceDiscount}
-                    onChange={(e) => setInvoiceDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+                    onValueChange={setInvoiceDiscount}
                     className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div className="flex justify-between text-base font-black text-slate-900 border-t border-slate-200 pt-2">
                   <span>صافي إجمالي الفاتورة:</span>
+
                   <span className="font-mono tabular-nums">
                     {formatCurrency(currentTotals.total, settings)}
                   </span>
@@ -805,6 +994,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
 
                 <div className="flex justify-between text-xs text-emerald-700 font-bold bg-emerald-50 p-2 rounded-lg">
                   <span>مجمل الربح المحقق:</span>
+
                   <span className="font-mono tabular-nums">
                     {formatCurrency(currentTotals.grossProfit, settings)}
                   </span>
@@ -816,6 +1006,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                 <label className="text-xs font-bold text-slate-700 block">
                   طريقة الدفع
                 </label>
+
                 <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl">
                   <button
                     type="button"
@@ -831,6 +1022,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   >
                     نقداً
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -845,6 +1037,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                   >
                     آجل (دين)
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('partial')}
@@ -866,12 +1059,12 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                       المبلغ المقبوض نقداً الآن
                     </label>
-                    <input
-                      type="number"
-                      min="0"
+
+                    <NumericInput
+                      min={0}
                       max={currentTotals.total}
                       value={paidAmountInput}
-                      onChange={(e) => setPaidAmountInput(parseFloat(e.target.value) || 0)}
+                      onValueChange={setPaidAmountInput}
                       className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:outline-hidden font-mono"
                     />
                   </div>
@@ -882,12 +1075,15 @@ export const SalesView: React.FC<SalesViewProps> = ({
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
                 <div className="flex justify-between font-bold text-emerald-800">
                   <span>المبلغ المقبوض للصندوق:</span>
+
                   <span className="font-mono tabular-nums">
                     {formatCurrency(currentTotals.paidAmount, settings)}
                   </span>
                 </div>
+
                 <div className="flex justify-between font-bold text-rose-700">
                   <span>المبلغ المتبقي دين على الزبون:</span>
+
                   <span className="font-mono tabular-nums">
                     {formatCurrency(currentTotals.remainingAmount, settings)}
                   </span>
@@ -899,6 +1095,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
                   ملاحظات الفاتورة (اختياري)
                 </label>
+
                 <textarea
                   rows={2}
                   placeholder="ملاحظات تسليم، مكان الورشة..."
@@ -932,6 +1129,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+
               <input
                 type="text"
                 placeholder="بحث برقم الفاتورة، اسم الزبون، المادة، أو التاريخ..."
@@ -943,6 +1141,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
 
             <div className="flex items-center gap-2 shrink-0">
               <Filter className="w-4 h-4 text-slate-400" />
+
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -973,6 +1172,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     <th className="py-3 px-4 text-center">الإجراءات</th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-slate-100">
                   {filteredSales.length === 0 ? (
                     <tr>
@@ -986,29 +1186,37 @@ export const SalesView: React.FC<SalesViewProps> = ({
                         <td className="py-3 px-4 font-bold font-mono text-slate-900">
                           {inv.invoiceNumber}
                         </td>
+
                         <td className="py-3 px-4 font-mono text-slate-600">
                           {inv.date} · {inv.time}
                         </td>
+
                         <td className="py-3 px-4 font-bold text-slate-800">
                           {inv.customerName}
                         </td>
+
                         <td className="py-3 px-4 text-center font-mono">
                           {inv.items.length}
                         </td>
+
                         <td className="py-3 px-4 text-left font-mono font-bold text-slate-900 tabular-nums">
                           {formatCurrency(inv.total, settings)}
                         </td>
+
                         <td className="py-3 px-4 text-left font-mono text-emerald-700 tabular-nums font-semibold">
                           {formatCurrency(inv.paidAmount, settings)}
                         </td>
+
                         <td className="py-3 px-4 text-left font-mono text-rose-700 tabular-nums font-semibold">
                           {inv.remainingAmount > 0
                             ? formatCurrency(inv.remainingAmount, settings)
                             : '-'}
                         </td>
+
                         <td className="py-3 px-4 text-left font-mono text-teal-700 tabular-nums">
                           {formatCurrency(inv.grossProfit, settings)}
                         </td>
+
                         <td className="py-3 px-4 text-center">
                           <span
                             className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
@@ -1020,6 +1228,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                             {inv.status === 'completed' ? 'مكتملة' : 'مرتجعة'}
                           </span>
                         </td>
+
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
@@ -1030,6 +1239,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                             >
                               <Printer className="w-4 h-4" />
                             </button>
+
                             <button
                               type="button"
                               onClick={() =>
@@ -1045,6 +1255,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                             >
                               <FileDown className="w-4 h-4" />
                             </button>
+
                             {inv.status === 'completed' && (
                               <button
                                 type="button"
@@ -1058,6 +1269,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                                 <RotateCcw className="w-4 h-4" />
                               </button>
                             )}
+
                             {onDeleteSale && (
                               <button
                                 type="button"
@@ -1095,10 +1307,12 @@ export const SalesView: React.FC<SalesViewProps> = ({
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4">
             <div className="flex items-center gap-2.5 text-rose-600">
               <AlertCircle className="w-5 h-5 shrink-0" />
+
               <h3 className="text-base font-bold text-slate-900">
                 إرجاع فاتورة مبيعات وعكس الحسابات والمخزون
               </h3>
             </div>
+
             <p className="text-xs text-slate-600">
               سيقوم التطبيق تلقائياً بإعادة الكميات المباعة إلى المستودع، وخصم المبلغ المقبوض من الصندوق، وإلغاء أي مديونية مرتبطة بهذه الفاتورة مع توثيق الحركة في سجل التدقيق.
             </p>
@@ -1107,6 +1321,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
               <label className="text-xs font-semibold text-slate-700 block mb-1">
                 سبب الإرجاع أو الإلغاء (مطلوب للتوثيق)
               </label>
+
               <input
                 type="text"
                 placeholder="مثال: تبديل مقاس الأنبوب، خطأ في الحساب..."
@@ -1124,6 +1339,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
               >
                 إلغاء
               </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -1131,6 +1347,7 @@ export const SalesView: React.FC<SalesViewProps> = ({
                     alert('يرجى كتابة سبب الإرجاع لحماية دقة الحسابات');
                     return;
                   }
+
                   onReturnSale(returnInvoiceId, returnReason.trim());
                   setReturnInvoiceId(null);
                 }}
@@ -1149,10 +1366,12 @@ export const SalesView: React.FC<SalesViewProps> = ({
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4">
             <div className="flex items-center gap-2.5 text-rose-600">
               <Trash2 className="w-5 h-5 shrink-0" />
+
               <h3 className="text-base font-bold text-slate-900">
                 حذف الفاتورة نهائياً من قاعدة البيانات (Firebase)
               </h3>
             </div>
+
             <p className="text-xs text-slate-600 leading-relaxed">
               تحذير: هل أنت متأكد من رغبتك في حذف هذه الفاتورة تماماً من قاعدة بيانات Firebase السحابية؟
               سيتم محو سجل الفاتورة وتفريغ المساحة المرتبطة بها في الخادم السحابي.
@@ -1166,12 +1385,14 @@ export const SalesView: React.FC<SalesViewProps> = ({
               >
                 تراجع
               </button>
+
               <button
                 type="button"
                 onClick={() => {
                   if (onDeleteSale && deleteConfirmId) {
                     onDeleteSale(deleteConfirmId);
                   }
+
                   setDeleteConfirmId(null);
                 }}
                 className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors shadow-xs cursor-pointer"
