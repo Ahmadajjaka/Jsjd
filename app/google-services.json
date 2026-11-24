@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "884929738685",
+    "project_id": "first-hook-1w2pc",
+    "storage_bucket": "first-hook-1w2pc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:884929738685:android:cd3a2d930598d5715584d4",
+        "android_client_info": {
+          "package_name": "com.almamo.hardware"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "884929738685-6oj1la68mnjq642fof5aumkjnn3lk24d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.almamo.hardware",
+            "certificate_hash": "645ddf6975fbed65f13640d5d5211b8ea1e114b5"
+          }
+        },
+        {
+          "client_id": "884929738685-g0k7ujn9o7p4m7t4kotal4edtgknuqgl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeKHEfCjGnB-u_pZlikp1IYi7rWfKXlbo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "884929738685-g0k7ujn9o7p4m7t4kotal4edtgknuqgl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
